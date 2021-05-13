@@ -3,15 +3,15 @@
 BitcaskC++ is a c++ implementation of the bistcask storage format. You can find the
 reference paper at [Bash Tehcnology](https://riak.com/assets/bitcask-intro.pdf). This is a high performance 
 key/value store with a very high write throughput. it includes a library for embeding inside your application 
-and a redis compatible server. 
+and a compatible server (wip). 
 
 ## Features
 
 * Embeddedable library `bitcaskcpp`
-* Builtin redis-compatible server (`bitcaskcppd`)
+* Builtin server (`bitcaskcpp-server`)
 * Predictable read/write performance
 * Low latency
-* High throughput (See: [Performance](README.md#Performance) )
+* High throughput
 
 ## Is Bitcask right for me?
 
@@ -43,5 +43,5 @@ cmake --build .
 
 ## Depends on:
 
-C++ implementation of [adaptive radix tree](https://github.com/rafaelkallis/adaptive-radix-tree)
-C++ implementation [CRC32](https://github.com/d-bahr/CRCpp)
+* C++ implementation of [adaptive radix tree](https://github.com/rafaelkallis/adaptive-radix-tree)
+* C++ implementation [CRC32](https://github.com/d-bahr/CRCpp)
