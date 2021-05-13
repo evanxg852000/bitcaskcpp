@@ -45,7 +45,8 @@ case "$1" in
   ;;
 
   test )
-    ./build/bin/tests
+    [ -d "./tempdir" ] && rm -rf "./tempdir"
+    ./build/bin/tests "${@:2}"
   ;;
 
   * )

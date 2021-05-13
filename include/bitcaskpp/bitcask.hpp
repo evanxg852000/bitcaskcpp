@@ -140,6 +140,7 @@ class Bitcask {
     uint64_t active_file_id;
     size_t size;
     std::shared_mutex mutex;
+    bool is_opened;
 
     void load_data(uint64_t file_id);
     void load_hint_file(uint64_t file_id);
@@ -154,27 +155,36 @@ class Bitcask {
         return ByteOrder::fromLittleEndian<T>(buffer.data());
     }
 
-    BitcaskFile& bitcask_file(uint64_t file_id) {
+    inline BitcaskFile& bitcask_file(uint64_t file_id) {
         auto entry = open_files.find(file_id);
-        if(entry == open_files.end())
-            throw new Exception(ExceptionType::FILE_NOT_FOUND, "TODO:");
+        if(entry == open_files.end()) {
+            throw Exception("Unabe to find file in the bitcask storage.");
+        }
+            
         return entry->second;
     }
 
+    inline void ensure() {
+        if(!is_opened) {
+            throw Exception("bistcask storage is not opened yet.");
+        }
+    }
+
     inline fs::path data_file(uint64_t fileId) {
-        return storage_dir / (std::to_string(fileId) + ".data");
+        return storage_dir / (std::to_string(fileId) + DATA_FILE_EXTENTION);
     }
 
     inline fs::path hint_file(uint64_t fileId) {
-        return storage_dir / (std::to_string(fileId) + ".hint");
+        return storage_dir / (std::to_string(fileId) + HINT_FILE_EXTENTION);
     }
 
-    inline fs::path lock_file() { return storage_dir / ".lock"; }
+    inline fs::path lock_file() { return storage_dir / LOCK_FILE; }
 
     inline static const char *TOMBSTONE = "BITCASKPP_TOMBSTONE_VALUE";
     inline static const char *DATA_FILE_EXTENTION = ".data";
     inline static const char *HINT_FILE_EXTENTION = ".hint";
     inline static const char *TEMP_FILE_EXTENTION = ".tmp";
+    inline static const char *LOCK_FILE = ".lock";
 };
 
 }  // namespace bitcaskpp

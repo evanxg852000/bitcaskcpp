@@ -11,7 +11,7 @@ namespace fs = std::filesystem;
 
 Bitcask::Bitcask(std::string path, BitcaskOption options)
     : storage_dir{fs::path(path)}, options{options},
-      active_file_id{0}, size{0} {}
+      active_file_id{0}, size{0}, is_opened{false} {}
 
 Bitcask::~Bitcask() {}
 
@@ -24,13 +24,13 @@ void Bitcask::Open() {
   if (!fs::exists(storage_dir)) {
     is_new = true;
     if (!fs::create_directory(storage_dir))
-      throw Exception("Unable to create database.");
+      throw Exception("Unable to create bitcask storage.");
   }
 
   // check if db is locked
   fs::path lock_file_path = storage_dir / ".lock";
   if (fs::exists(lock_file_path)) {
-    throw Exception("Database already in use by another process");
+    throw Exception("bitcask storage already in use by another process");
   }
 
   // create the lock file
@@ -44,6 +44,7 @@ void Bitcask::Open() {
     //_currentGeneration = 1;
     active_file_id = 1;
     open_files.insert({active_file_id, BitcaskFile{data_file(active_file_id)}});
+    is_opened = true;
     return;
   }
 
@@ -61,6 +62,7 @@ void Bitcask::Open() {
     uint64_t file_id = std::stoull(p.path().stem()); // TODO execption
     load_data(file_id);
   }
+  is_opened = true;
 }
 
 void Bitcask::Close() {
@@ -69,11 +71,13 @@ void Bitcask::Close() {
   }
   fs::remove(lock_file());
   open_files.clear();
+  is_opened = false;
 }
 
 void Bitcask::Put(const char *key, const char *value) {
   assert(key != nullptr);
   assert(value != nullptr);
+  ensure();
 
   // position the writer
   std::fstream &writer = bitcask_file(active_file_id).GetFileStream();
@@ -97,17 +101,29 @@ void Bitcask::Put(const char *key, const char *value) {
   buffer.append(ByteOrder::toLittleEndianString<size_t>(record_offset));
 
   writer.write(buffer.data(), buffer.length());
+  
+  BitcaskEntry *entry = key_dir.get(key);
+  if (entry == nullptr && value != Bitcask::TOMBSTONE)
+    size += 1;
   key_dir.set(key,
               new BitcaskEntry(active_file_id, buffer.length(), record_offset));
-  size += 1;
 }
 
-bool Bitcask::Has(const char *key) { return key_dir.get(key) != nullptr; }
+bool Bitcask::Has(const char *key) {
+  assert(key != nullptr);
+  ensure();
+
+  return key_dir.get(key) != nullptr; 
+}
 
 std::string Bitcask::Get(const char *key) {
+  assert(key != nullptr);
+  ensure();
+
   BitcaskEntry *entry = key_dir.get(key);
-  if (entry == nullptr)
-    throw new Exception(ExceptionType::KEY_NOT_FOUND, "TODO:");
+  if (entry == nullptr) {
+    throw Exception("Requested key not found in bistcask storage.");
+  }
 
   std::fstream& reader = bitcask_file(entry->file_id).GetFileStream();
   auto [_, __, value] = get_value(reader, entry->record_offset);
@@ -115,21 +131,26 @@ std::string Bitcask::Get(const char *key) {
 }
 
 void Bitcask::Delete(const char *key) {
-  std::cout << "size" << this->size << std::endl;
-  this->size = this->size - 1;
-  std::cout << "size-after " << this->size << std::endl;
+  assert(key != nullptr);
+  ensure();
+
   BitcaskEntry *entry = key_dir.get(key);
-  if (entry == nullptr)
-    throw new Exception(ExceptionType::KEY_NOT_FOUND, "TODO:");
+  if (entry == nullptr) {
+    throw Exception("Requested key not found in bistcask storage.");
+  }
 
   this->Put(key, Bitcask::TOMBSTONE);
   key_dir.del(key);
-  
+  size -= 1;
 }
 
 size_t Bitcask::Size() { return size; }
 
 void Bitcask::Scan(char *prefix, scan_callback_t func) {
+  assert(prefix != nullptr);
+  assert(func != nullptr);
+  ensure();
+  
   for (auto it = key_dir.begin(prefix); it != key_dir.end(); ++it) {
     std::fstream& reader = bitcask_file((*it)->file_id).GetFileStream();
     auto [_, key, value] = get_value(reader, (*it)->record_offset);
@@ -138,11 +159,15 @@ void Bitcask::Scan(char *prefix, scan_callback_t func) {
 }
 
 void Bitcask::Sync() {
+  ensure();
+
   std::fstream &writter = bitcask_file(active_file_id).GetFileStream();
   writter.flush();
 }
 
 BitcaskStats Bitcask::Statistics() {
+  ensure();
+
   size_t disposable = 0;
   size_t total = 0;
   size_t num_files = 0;
@@ -156,6 +181,8 @@ BitcaskStats Bitcask::Statistics() {
 }
 
 void Bitcask::Compact() {
+  ensure();
+
   // TODO: wlock
   active_file_id += 2;
   uint64_t compation_file_id = active_file_id - 1;
@@ -311,5 +338,3 @@ std::string Bitcask::read_data(std::istream &reader, size_t offset, size_t size)
 }
 
 } // namespace bitcaskpp
-
-// https://us02web.zoom.us/j/88946365804
