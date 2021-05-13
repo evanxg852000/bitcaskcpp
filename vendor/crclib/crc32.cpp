@@ -17,8 +17,6 @@
 // - crc32_16bytes  needs all of Crc32Lookup
 
 
-#include "bitcaskpp/crc32.hpp"
-
 #ifndef __LITTLE_ENDIAN
   #define __LITTLE_ENDIAN 1234
 #endif

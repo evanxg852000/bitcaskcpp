@@ -19,5 +19,5 @@ endforeach()
 file(GLOB_RECURSE TESTS_SOURCE_FILES "./*.cpp")
 
 add_executable(tests ${TESTS_SOURCE_FILES} ${PROJECTS_SOURCE_FILES})
-target_link_libraries(tests  bitcaskpp ${CONAN_LIBS})
+target_link_libraries(tests  bitcaskcpp ${CONAN_LIBS})
 install(TARGETS tests DESTINATION ${BUILD_FOLDER})

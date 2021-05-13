@@ -5,8 +5,7 @@
 #include <stdexcept>
 #include <string>
 
-namespace bitcaskpp {
-
+namespace bitcaskcpp {
 
 class Exception : public std::runtime_error {
    public:
@@ -16,4 +15,4 @@ class Exception : public std::runtime_error {
 
 };
 
-}  // namespace bitcaskpp
+}  // namespace bitcaskcpp

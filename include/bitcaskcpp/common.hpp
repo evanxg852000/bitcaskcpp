@@ -1,15 +1,10 @@
 #pragma once
 
 #include <string>
-#include <chrono>
-#include <ctime>
 
 #include "cxxutils/byteorder.hpp"
 
-namespace bitcaskpp {
-
-//using file_id_t = uint64_t;
-using byte = char;
+namespace bitcaskcpp {
 
 class BitcaskOption {};
 

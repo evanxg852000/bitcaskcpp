@@ -4,9 +4,9 @@
 #include <unordered_set>
 #include <iostream>
 
-#include "bitcaskpp/bitcask.hpp"
+#include "bitcaskcpp/bitcask.hpp"
 
-namespace bitcaskpp {
+namespace bitcaskcpp {
 namespace fs = std::filesystem;
 
 Bitcask::Bitcask(std::string path, BitcaskOption options)
@@ -16,6 +16,8 @@ Bitcask::Bitcask(std::string path, BitcaskOption options)
 Bitcask::~Bitcask() {}
 
 void Bitcask::Open() {
+  std::unique_lock lock(mutex);
+
   // check if dir exist & not locked
   // create db dir
   bool is_new = false;
@@ -66,6 +68,8 @@ void Bitcask::Open() {
 }
 
 void Bitcask::Close() {
+  std::unique_lock lock(mutex);
+
   for (auto &[_, file] : open_files) {
     file.GetFileStream().close();
   }
@@ -77,40 +81,25 @@ void Bitcask::Close() {
 void Bitcask::Put(const char *key, const char *value) {
   assert(key != nullptr);
   assert(value != nullptr);
+  if (value == Bitcask::TOMBSTONE) {
+    throw Exception("The specified value is a sentinel that cannot be used in bitcask storage.");
+  }
+
+  std::unique_lock lock(mutex);
   ensure();
 
-  // position the writer
-  std::fstream &writer = bitcask_file(active_file_id).GetFileStream();
-  writer.seekp(0, std::ios_base::end);
-  size_t record_offset = writer.tellp();
-
-  // calculate checksum
-  std::string buffer(key);
-  buffer.append(value);
-  uint32_t checksum = crc32_checksum(buffer.data(), buffer.length());
-
-  size_t key_size = std::strlen(key);
-  size_t value_size = std::strlen(value);
-
-  buffer.clear();
-  buffer.append(ByteOrder::toLittleEndianString<uint32_t>(checksum));
-  buffer.append(ByteOrder::toLittleEndianString<size_t>(key_size));
-  buffer.append(ByteOrder::toLittleEndianString<size_t>(value_size));
-  buffer.append(key);
-  buffer.append(value);
-  buffer.append(ByteOrder::toLittleEndianString<size_t>(record_offset));
-
-  writer.write(buffer.data(), buffer.length());
-  
-  BitcaskEntry *entry = key_dir.get(key);
-  if (entry == nullptr && value != Bitcask::TOMBSTONE)
+  bool is_new = (key_dir.get(key) == nullptr);
+  auto [record_size, record_offset] = write_value(key, value);
+  key_dir.set(key, new BitcaskEntry(active_file_id, record_size, record_offset));
+  if(is_new) {
     size += 1;
-  key_dir.set(key,
-              new BitcaskEntry(active_file_id, buffer.length(), record_offset));
+  }
 }
 
 bool Bitcask::Has(const char *key) {
   assert(key != nullptr);
+  
+  std::shared_lock lock(mutex);
   ensure();
 
   return key_dir.get(key) != nullptr; 
@@ -118,6 +107,8 @@ bool Bitcask::Has(const char *key) {
 
 std::string Bitcask::Get(const char *key) {
   assert(key != nullptr);
+  
+  std::shared_lock lock(mutex);
   ensure();
 
   BitcaskEntry *entry = key_dir.get(key);
@@ -132,6 +123,8 @@ std::string Bitcask::Get(const char *key) {
 
 void Bitcask::Delete(const char *key) {
   assert(key != nullptr);
+
+  std::unique_lock lock(mutex);
   ensure();
 
   BitcaskEntry *entry = key_dir.get(key);
@@ -139,16 +132,22 @@ void Bitcask::Delete(const char *key) {
     throw Exception("Requested key not found in bistcask storage.");
   }
 
-  this->Put(key, Bitcask::TOMBSTONE);
+  write_value(key, Bitcask::TOMBSTONE);
   key_dir.del(key);
   size -= 1;
 }
 
-size_t Bitcask::Size() { return size; }
+size_t Bitcask::Size() {
+  std::shared_lock lock(mutex);
+  ensure();
+  return size; 
+}
 
 void Bitcask::Scan(char *prefix, scan_callback_t func) {
   assert(prefix != nullptr);
   assert(func != nullptr);
+
+  std::shared_lock lock(mutex);
   ensure();
   
   for (auto it = key_dir.begin(prefix); it != key_dir.end(); ++it) {
@@ -159,6 +158,7 @@ void Bitcask::Scan(char *prefix, scan_callback_t func) {
 }
 
 void Bitcask::Sync() {
+  std::unique_lock lock(mutex);
   ensure();
 
   std::fstream &writter = bitcask_file(active_file_id).GetFileStream();
@@ -166,6 +166,7 @@ void Bitcask::Sync() {
 }
 
 BitcaskStats Bitcask::Statistics() {
+  std::shared_lock lock(mutex);
   ensure();
 
   size_t disposable = 0;
@@ -181,9 +182,9 @@ BitcaskStats Bitcask::Statistics() {
 }
 
 void Bitcask::Compact() {
+  std::unique_lock lock(mutex);
   ensure();
 
-  // TODO: wlock
   active_file_id += 2;
   uint64_t compation_file_id = active_file_id - 1;
   BitcaskFile active_file{data_file(active_file_id)};
@@ -330,6 +331,33 @@ std::tuple<size_t, std::string, std::string> Bitcask::get_value(std::istream &re
   return std::make_tuple(record_size, key, value);
 }
 
+std::tuple<size_t, size_t> Bitcask::write_value(const char *key, const char *value) {
+  // position the writer
+  std::fstream &writer = bitcask_file(active_file_id).GetFileStream();
+  writer.seekp(0, std::ios_base::end);
+  size_t record_offset = writer.tellp();
+
+  // calculate checksum
+  std::string buffer(key);
+  buffer.append(value);
+  uint32_t checksum = crc32_checksum(buffer.data(), buffer.length());
+
+  size_t key_size = std::strlen(key);
+  size_t value_size = std::strlen(value);
+
+  buffer.clear();
+  buffer.append(ByteOrder::toLittleEndianString<uint32_t>(checksum));
+  buffer.append(ByteOrder::toLittleEndianString<size_t>(key_size));
+  buffer.append(ByteOrder::toLittleEndianString<size_t>(value_size));
+  buffer.append(key);
+  buffer.append(value);
+  buffer.append(ByteOrder::toLittleEndianString<size_t>(record_offset));
+
+  writer.write(buffer.data(), buffer.length());
+
+  return std::make_tuple(buffer.length(), record_offset);
+}
+
 std::string Bitcask::read_data(std::istream &reader, size_t offset, size_t size) {
   reader.seekg(offset, std::ios_base::beg);
   std::string buffer(size, '\0');
@@ -337,4 +365,4 @@ std::string Bitcask::read_data(std::istream &reader, size_t offset, size_t size)
   return buffer;
 }
 
-} // namespace bitcaskpp
+} // namespace bitcaskcpp

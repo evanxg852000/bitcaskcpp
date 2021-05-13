@@ -10,11 +10,11 @@
 #include <utility>
 
 #include "art/art.hpp"
-#include "bitcaskpp/common.hpp"
-#include "bitcaskpp/exception.hpp"
+#include "bitcaskcpp/common.hpp"
+#include "bitcaskcpp/exception.hpp"
 #include "cxxutils/byteorder.hpp"
 
-namespace bitcaskpp {
+namespace bitcaskcpp {
 namespace fs = std::filesystem;
 
 typedef int (*scan_callback_t)(std::string key, std::string value);
@@ -139,13 +139,14 @@ class Bitcask {
     std::unordered_map<uint64_t, BitcaskFile> open_files;
     uint64_t active_file_id;
     size_t size;
-    std::shared_mutex mutex;
     bool is_opened;
+    std::shared_mutex mutex;
 
     void load_data(uint64_t file_id);
     void load_hint_file(uint64_t file_id);
     std::tuple<size_t, std::string, std::string> get_value(std::istream &reader,
                                                  size_t offset);
+    std::tuple<size_t, size_t> write_value(const char *key, const char *value);
 
     std::string read_data(std::istream &reader, size_t offset, size_t size);
 
@@ -180,11 +181,11 @@ class Bitcask {
 
     inline fs::path lock_file() { return storage_dir / LOCK_FILE; }
 
-    inline static const char *TOMBSTONE = "BITCASKPP_TOMBSTONE_VALUE";
+    inline static const char *TOMBSTONE = "BITCASKCPP_TOMBSTONE_VALUE";
     inline static const char *DATA_FILE_EXTENTION = ".data";
     inline static const char *HINT_FILE_EXTENTION = ".hint";
     inline static const char *TEMP_FILE_EXTENTION = ".tmp";
     inline static const char *LOCK_FILE = ".lock";
 };
 
-}  // namespace bitcaskpp
+}  // namespace bitcaskcpp

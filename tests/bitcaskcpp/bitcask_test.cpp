@@ -4,7 +4,7 @@
 
 #include <catch2/catch.hpp>
 
-#include "bitcaskpp/bitcask.hpp"
+#include "bitcaskcpp/bitcask.hpp"
 
 namespace fs = std::filesystem;
 
@@ -26,11 +26,11 @@ void debug(const std::function<void()>& callback) {
 
 
 TEST_CASE("Opening bitcask", "[open]") {
-    bitcaskpp::BitcaskOption options;
+    bitcaskcpp::BitcaskOption options;
 
     bool status = with("tempdir", [&](fs::path& dir) {
         auto db_path = dir / "testdb";
-        bitcaskpp::Bitcask bitcsk(db_path, options);
+        bitcaskcpp::Bitcask bitcsk(db_path, options);
         bitcsk.Open();
 
         // check bd folder & all necessary files exist
@@ -45,10 +45,10 @@ TEST_CASE("Opening bitcask", "[open]") {
 }
 
 TEST_CASE("bitcask operation not allowed when not-opened or closed", "[not-open-closed]") {
-    bitcaskpp::BitcaskOption options;
+    bitcaskcpp::BitcaskOption options;
     bool status = with("tempdir", [&](fs::path& dir) {
         auto db_path = dir / "testdb";
-        bitcaskpp::Bitcask bitcsk(db_path, options);
+        bitcaskcpp::Bitcask bitcsk(db_path, options);
 
         REQUIRE_THROWS(bitcsk.Put("a", "a"));
         REQUIRE_THROWS(bitcsk.Get("a"));
@@ -64,10 +64,10 @@ TEST_CASE("bitcask operation not allowed when not-opened or closed", "[not-open-
 }
 
 TEST_CASE("CRUD operation on bitcask", "[crud]") {
-    bitcaskpp::BitcaskOption options;
+    bitcaskcpp::BitcaskOption options;
     bool status = with("tempdir", [&](fs::path& dir) {
         auto db_path = dir / "testdb";
-        bitcaskpp::Bitcask bitcsk(db_path, options);
+        bitcaskcpp::Bitcask bitcsk(db_path, options);
         bitcsk.Open();
 
         // insert
@@ -77,6 +77,7 @@ TEST_CASE("CRUD operation on bitcask", "[crud]") {
         bitcsk.Put("age", "25");
         bitcsk.Put("foot", "right");
         bitcsk.Put("positions", "[ST, LW]");
+        REQUIRE_THROWS(bitcsk.Put("sentinel", "BITCASKCPP_TOMBSTONE_VALUE"));
         REQUIRE(bitcsk.Size() == 6);
         REQUIRE(bitcsk.Get("name") == "Timo Werner");
         REQUIRE(bitcsk.Get("height") == "180");
@@ -107,10 +108,10 @@ TEST_CASE("CRUD operation on bitcask", "[crud]") {
 }
 
 TEST_CASE("CRUD operation on bitcask with close", "[crud-close]") {
-    bitcaskpp::BitcaskOption options;
+    bitcaskcpp::BitcaskOption options;
     bool status = with("tempdir", [&](fs::path& dir) {
         auto db_path = dir / "testdb";
-        bitcaskpp::Bitcask bitcsk(db_path, options);
+        bitcaskcpp::Bitcask bitcsk(db_path, options);
         bitcsk.Open();
 
         // insert
@@ -157,4 +158,9 @@ TEST_CASE("CRUD operation on bitcask with close", "[crud-close]") {
     });
 
     REQUIRE(status == true);
+}
+
+
+TEST_CASE("CRUD operation on bitcask with concurency", "[crud-close]") {
+
 }
