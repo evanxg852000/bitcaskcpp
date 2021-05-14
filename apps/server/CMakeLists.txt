@@ -1,9 +1,9 @@
 cmake_minimum_required(VERSION 3.9)
 project(server)
 
-file(GLOB MAIN_SOURCE_FILES "./*.cpp")
+file(GLOB MAIN_SOURCE_FILES "./*.cc")
 
-include_directories(${VENDOR_DIR})
+include_directories(${THIRD_PARTY_DIR})
 include_directories(${INCLUDE_DIR})
 
 add_executable(server ${MAIN_SOURCE_FILES})

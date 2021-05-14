@@ -1,4 +1,7 @@
 # BitcaskC++
+[![Language](https://img.shields.io/badge/language-C++-blue.svg)](https://isocpp.org/) [![Standard](https://img.shields.io/badge/C%2B%2B-17-blue.svg)](https://en.wikipedia.org/wiki/C%2B%2B#Standardization) [![License](https://img.shields.io/badge/license-Apache%202-blue.svg)](https://opensource.org/licenses/MIT)
+
+[![Build Status](https://travis-ci.org/evanxg852000/bitcaskcpp.svg?branch=master)](https://travis-ci.org/evanxg852000/bitcaskcpp)
 
 BitcaskC++ is a c++ implementation of the bistcask storage format. You can find the
 reference paper at [Bash Tehcnology](https://riak.com/assets/bitcask-intro.pdf). This is a high performance 
@@ -43,5 +46,16 @@ cmake --build .
 
 ## Depends on:
 
-* C++ implementation of [adaptive radix tree](https://github.com/rafaelkallis/adaptive-radix-tree)
-* C++ implementation [CRC32](https://github.com/d-bahr/CRCpp)
+* [Adaptive Radix Tree](https://github.com/rafaelkallis/adaptive-radix-tree)
+* [CRC32](https://github.com/google/crc32c)
+* [Cxx-Opts](https://github.com/jarro2783/cxxopts/)
+* [Crow](https://github.com/CrowCpp/crow)
+* [Picobench](https://github.com/iboB/picobench)
+* [Plog](https://github.com/SergiusTheBest/plog)
+
+TODO:
+- [ ] benchmark
+- [ ] test concurency
+- [ ] add crc & compaction trigger option 
+
+

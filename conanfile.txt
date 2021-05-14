@@ -1,7 +1,10 @@
 [requires]
-boost/1.69.0
-asio/1.12.2
+crowcpp-crow/0.2
+boost/1.76.0
 fmt/6.2.1
+cxxopts/2.2.1
+plog/1.1.5
+crc32c/1.1.1
 catch2/2.12.1
 
 [generators]

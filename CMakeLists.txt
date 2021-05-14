@@ -13,7 +13,7 @@ set(BUILD_FOLDER "./build")
 set(SOURCE_DIR "${PROJECT_SOURCE_DIR}/src")
 set(APPS_DIR "${PROJECT_SOURCE_DIR}/apps")
 set(INCLUDE_DIR "${PROJECT_SOURCE_DIR}/include")
-set(VENDOR_DIR "${PROJECT_SOURCE_DIR}/vendor")
+set(THIRD_PARTY_DIR "${PROJECT_SOURCE_DIR}/third_party")
 
 
 include(${CMAKE_BINARY_DIR}/conanbuildinfo.cmake)
