@@ -49,6 +49,11 @@ case "$1" in
     ./build/bin/tests "${@:2}"
   ;;
 
+  benchmarks )
+    [ -d "./tempdir" ] && rm -rf "./tempdir"
+    ./build/bin/benchmarks "${@:2}"
+  ;;
+
   * )
     show_help
   ;;

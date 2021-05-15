@@ -38,7 +38,7 @@ docker run -it -v "$PWD":"/home/connan/project" cppimage bash
 
 ```bash
 BUIDKIT=1 docker build -t cppimage .
-docker run -v "$PWD":"/home/connan/project" cppimage bash
+docker run -it -v "$PWD":"/home/connan/project" cppimage
 conan install ..  -s build_type=Release --build
 cmake .. -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release
 cmake --build .
@@ -57,5 +57,22 @@ TODO:
 - [ ] benchmark
 - [ ] test concurency
 - [ ] add crc & compaction trigger option 
+
+```
+===============================================================================
+   Name (baseline is *)   |   Dim   |  Total ms |  ns/op  |Baseline| Ops/second
+===============================================================================
+           bistcask_put * |       8 |     0.030 |    3811 |      - |   262381.1
+             bistcask_get |       8 |     0.043 |    5373 |  1.410 |   186085.5
+           bistcask_put * |      64 |     0.178 |    2788 |      - |   358593.6
+             bistcask_get |      64 |     0.323 |    5046 |  1.810 |   198147.9
+           bistcask_put * |     512 |     1.404 |    2742 |      - |   364658.6
+             bistcask_get |     512 |     2.299 |    4491 |  1.638 |   222661.0
+           bistcask_put * |    4096 |     8.861 |    2163 |      - |   462255.8
+             bistcask_get |    4096 |    13.229 |    3229 |  1.493 |   309629.5
+           bistcask_put * |    8192 |    15.843 |    1934 |      - |   517059.5
+             bistcask_get |    8192 |    24.587 |    3001 |  1.552 |   333177.9
+===============================================================================
+```
 
 
