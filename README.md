@@ -4,7 +4,7 @@
 [![Build Status](https://travis-ci.org/evanxg852000/bitcaskcpp.svg?branch=master)](https://travis-ci.org/evanxg852000/bitcaskcpp)
 
 BitcaskC++ is a c++ implementation of the bistcask storage format. You can find the
-reference paper at [Bash Tehcnology](https://riak.com/assets/bitcask-intro.pdf). This is a high performance 
+reference paper at [Basho Tehcnology](https://riak.com/assets/bitcask-intro.pdf). This is a high performance 
 key/value store with a very high write throughput. it includes a library for embeding inside your application 
 and a compatible server (wip). 
 
