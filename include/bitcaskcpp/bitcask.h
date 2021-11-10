@@ -150,11 +150,12 @@ class Bitcask {
 
     std::string read_data(std::istream &reader, size_t offset, size_t size);
 
-    template <typename T>
-    T read(std::istream &reader, size_t offset) {
-        std::string buffer = read_data(reader, offset, sizeof(T));
-        return ByteOrder::fromLittleEndian<T>(buffer.data());
-    }
+    // template <typename T>
+    // T read(std::istream &reader, size_t offset) {
+    //     ByteOrder::readLittleEndian<uint32_t>(reader, layout.GetChecksumOffset());
+    //     std::string buffer = read_data(reader, offset, sizeof(T));
+    //     return ByteOrder::fromLittleEndian<T>(buffer.data());
+    // }
 
     inline BitcaskFile& bitcask_file(uint64_t file_id) {
         auto entry = open_files.find(file_id);

@@ -54,6 +54,22 @@ class ByteOrder {
         return from_bytes<T>(data, Endianness::Little);
     }
 
+    template<class T>
+    static T readLittleEndian(std::istream &reader, size_t offset) {
+        reader.seekg(offset, std::ios_base::beg);
+        size_t size = sizeof(T);
+        std::string buffer(size, '\0');
+        reader.read(buffer.data(), size);
+        return from_bytes<T>(buffer.data(), Endianness::Little);
+    }
+
+    template<class T>
+    static void writeLittleEndian(std::ostream &writer, T v) {
+        auto buffer = to_bytes<T>(v, Endianness::Little);
+        writer.write(buffer.data(), buffer.size());
+    }
+
+
     template <class T>
     static std::array<char, sizeof(T)> toBigEndian(T v) {
         return std::move(to_bytes<T>(v, Endianness::Big));
@@ -69,6 +85,21 @@ class ByteOrder {
     template <class T>
     static T fromBigEndian(const char *data) {
         return from_bytes<T>(data, Endianness::Big);
+    }
+
+    template<class T>
+    static T readBigEndian(std::istream &reader, size_t offset) {
+        reader.seekg(offset, std::ios_base::beg);
+        size_t size = sizeof(T);
+        std::string buffer(size, '\0');
+        reader.read(buffer.data(), size);
+        return from_bytes<T>(buffer.data(), Endianness::Little);
+    }
+
+    template<class T>
+    static void writeBigEndian(std::ostream &writer, T v) {
+        auto buffer = to_bytes<T>(v, Endianness::Big);
+        writer.write(buffer.data(), buffer.size());
     }
 
    private:

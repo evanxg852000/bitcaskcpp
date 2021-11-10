@@ -85,6 +85,9 @@
         "numeric": "cpp",
         "random": "cpp",
         "ranges": "cpp",
-        "stop_token": "cpp"
+        "stop_token": "cpp",
+        "queue": "cpp",
+        "numbers": "cpp",
+        "semaphore": "cpp"
     }
 }
