@@ -3,6 +3,7 @@
 #include <fstream>
 #include <unordered_set>
 #include <iostream>
+#include <sstream>
 
 #include "bitcaskcpp/bitcask.h"
 
@@ -13,7 +14,11 @@ Bitcask::Bitcask(std::string path, BitcaskOption options)
     : storage_dir{fs::path(path)}, options{options},
       active_file_id{0}, size{0}, is_opened{false} {}
 
-Bitcask::~Bitcask() {}
+Bitcask::~Bitcask() {
+  if (options.auto_close && is_opened) {
+    this->Close();
+  }  
+}
 
 void Bitcask::Open() {
   std::unique_lock lock(mutex);
@@ -143,18 +148,22 @@ size_t Bitcask::Size() {
   return size; 
 }
 
-void Bitcask::Scan(char *prefix, scan_callback_t func) {
+size_t Bitcask::Scan(const char *prefix, scan_callback_t func) {
   assert(prefix != nullptr);
   assert(func != nullptr);
 
   std::shared_lock lock(mutex);
   ensure();
   
+  size_t count = 0;
   for (auto it = key_dir.begin(prefix); it != key_dir.end(); ++it) {
     std::fstream& reader = bitcask_file((*it)->file_id).GetFileStream();
     auto [_, key, value] = get_value(reader, (*it)->record_offset);
+    if(key.rfind(prefix, 0) != 0) break;
     func(key, value);
+    count++;
   }
+  return count;
 }
 
 void Bitcask::Sync() {
@@ -218,7 +227,7 @@ void Bitcask::Compact() {
 
     // create hint_file entry
     // TODO: try to make key available via iterator, it's realy annoying that we
-    // have to read this via disk data
+    // have to read this from disk
     // https://github.com/rafaelkallis/adaptive-radix-tree/issues/9
     std::stringstream data_reader;
     data_reader.str(buffer.data());
@@ -226,7 +235,7 @@ void Bitcask::Compact() {
     size_t key_size = key.length();
     size_t record_size = buffer.length();
 
-    buffer.resize(BitcaskLayout::GetHintRecordSize(key_size), '\0');
+    buffer.resize(BitcaskItemLayout::GetHintRecordSize(key_size), '\0'); //TODO: check clear
     buffer.append(ByteOrder::toLittleEndianString<size_t>(key_size));
     buffer.append(key);
     buffer.append(ByteOrder::toLittleEndianString<size_t>(record_size));
@@ -263,14 +272,16 @@ void Bitcask::load_data(uint64_t file_id) {
 
   // traverse from end of file
   std::unordered_set<char *> processed_keys{};
-  size_t record_offset = read<size_t>(reader, file_size - sizeof(size_t));
+  size_t record_offset = ByteOrder::readLittleEndian<size_t>(reader, file_size - sizeof(size_t));
+  //read<size_t>(reader, file_size - sizeof(size_t));
   size_t disposable_size = 0;
   while (true) {
     auto [record_size, key, value] = get_value(reader, record_offset);
     if (processed_keys.find(key.data()) == processed_keys.end()) {
       if (record_offset == 0)
         break;
-      record_offset = read<size_t>(reader, record_offset - sizeof(size_t));
+      record_offset = ByteOrder::readLittleEndian<size_t>(reader, record_offset - sizeof(size_t));
+      //read<size_t>(reader, record_offset - sizeof(size_t));
       continue;
     }
     processed_keys.insert(key.data());
@@ -279,14 +290,14 @@ void Bitcask::load_data(uint64_t file_id) {
       disposable_size += record_size;
       if (record_offset == 0)
         break;
-      record_offset = read<size_t>(reader, record_offset - sizeof(size_t));
+      record_offset = ByteOrder::readLittleEndian<size_t>(reader, record_offset - sizeof(size_t));
       continue;
     }
 
     key_dir.set(key.data(), new BitcaskEntry(file_id, record_size, record_offset));
     if (record_offset == 0)
       break;
-    record_offset = read<size_t>(reader, record_offset - sizeof(size_t));
+    record_offset = ByteOrder::readLittleEndian<size_t>(reader, record_offset - sizeof(size_t));
   }
 
   btcsk_file.disposable_size = disposable_size;
@@ -303,30 +314,30 @@ void Bitcask::load_hint_file(uint64_t file_id) {
 
   // traverse hint file forward
   while (offset <= total_size) {
-    BitcaskLayout layout(offset);
-    size_t key_size = read<size_t>(reader, layout.GetHintKeySizeOffset());
+    BitcaskItemLayout layout(offset);
+    size_t key_size = ByteOrder::readLittleEndian<size_t>(reader, layout.GetHintKeySizeOffset());
     std::string key = read_data(reader, layout.GetHintKeyOffset(), key_size);
     size_t record_size =
-        read<size_t>(reader, layout.GetHintRecordSizeOffset(key_size));
-    size_t record_offset =
-        read<size_t>(reader, layout.GetHintRecordOffsetOffset(key_size));
+        ByteOrder::readLittleEndian<size_t>(reader, layout.GetHintRecordSizeOffset(key_size));
+    size_t record_offset = 
+        ByteOrder::readLittleEndian<size_t>(reader, layout.GetHintRecordOffsetOffset(key_size));
     key_dir.set(key.data(),
                 new BitcaskEntry(file_id, record_size, record_offset));
-    offset += BitcaskLayout::GetHintRecordSize(key_size);
+    offset += BitcaskItemLayout::GetHintRecordSize(key_size);
   }
 }
 
 std::tuple<size_t, std::string, std::string> Bitcask::get_value(std::istream &reader,
                                                       size_t offset) {
-  BitcaskLayout layout(offset);
+  BitcaskItemLayout layout(offset);
 
-  uint32_t checksum = read<uint32_t>(reader, layout.GetChecksumOffset());
-  size_t key_size = read<size_t>(reader, layout.GetKeySizeOffset());
-  size_t value_size = read<size_t>(reader, layout.GetValueSizeOffset());
+  uint32_t checksum = ByteOrder::readLittleEndian<uint32_t>(reader, layout.GetChecksumOffset());
+  size_t key_size = ByteOrder::readLittleEndian<size_t>(reader, layout.GetKeySizeOffset());
+  size_t value_size = ByteOrder::readLittleEndian<size_t>(reader, layout.GetValueSizeOffset());
 
   std::string key = read_data(reader, layout.GetKeyOffset(), key_size);
   std::string value = read_data(reader, layout.GetValueOffset(key_size), value_size);
-  size_t record_size = BitcaskLayout::GetRecordSize(key_size, value_size);
+  size_t record_size = BitcaskItemLayout::GetRecordSize(key_size, value_size);
 
   return std::make_tuple(record_size, key, value);
 }
@@ -338,31 +349,32 @@ std::tuple<size_t, size_t> Bitcask::write_value(const char *key, const char *val
   size_t record_offset = writer.tellp();
 
   // calculate checksum
-  std::string buffer(key);
-  buffer.append(value);
-  uint32_t checksum = crc32_checksum(buffer.data(), buffer.length());
+  std::stringstream buffer;
+  buffer << key << value;
+  uint32_t checksum = crc32_checksum(buffer.str().data(), buffer.str().length());
 
   size_t key_size = std::strlen(key);
   size_t value_size = std::strlen(value);
 
+  // reset buffer for writting
   buffer.clear();
-  buffer.append(ByteOrder::toLittleEndianString<uint32_t>(checksum));
-  buffer.append(ByteOrder::toLittleEndianString<size_t>(key_size));
-  buffer.append(ByteOrder::toLittleEndianString<size_t>(value_size));
-  buffer.append(key);
-  buffer.append(value);
-  buffer.append(ByteOrder::toLittleEndianString<size_t>(record_offset));
+  buffer.str("");
 
-  writer.write(buffer.data(), buffer.length());
+  ByteOrder::writeLittleEndian<uint32_t>(buffer, checksum);
+  ByteOrder::writeLittleEndian<size_t>(buffer, key_size);
+  ByteOrder::writeLittleEndian<size_t>(buffer, value_size);
+  buffer << key << value;
+  ByteOrder::writeLittleEndian<size_t>(buffer, record_offset);
+  writer.write(buffer.str().data(), buffer.str().length());
 
-  return std::make_tuple(buffer.length(), record_offset);
+  return std::make_tuple(buffer.str().length(), record_offset);
 }
 
 std::string Bitcask::read_data(std::istream &reader, size_t offset, size_t size) {
   reader.seekg(offset, std::ios_base::beg);
   std::string buffer(size, '\0');
   reader.read(buffer.data(), size);
-  return buffer;
+  return std::move(buffer);
 }
 
 } // namespace bitcaskcpp

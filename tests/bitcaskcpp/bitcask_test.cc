@@ -71,7 +71,7 @@ TEST_CASE("CRUD operation on bitcask", "[crud]") {
         bitcsk.Open();
 
         // insert
-        bitcsk.Put("name", "Timo Werner");
+        bitcsk.Put("name", "Jason");
         bitcsk.Put("height", "180");
         bitcsk.Put("weight", "76");
         bitcsk.Put("age", "25");
@@ -79,16 +79,16 @@ TEST_CASE("CRUD operation on bitcask", "[crud]") {
         bitcsk.Put("positions", "[ST, LW]");
         REQUIRE_THROWS(bitcsk.Put("sentinel", "BITCASKCPP_TOMBSTONE_VALUE"));
         REQUIRE(bitcsk.Size() == 6);
-        REQUIRE(bitcsk.Get("name") == "Timo Werner");
+        REQUIRE(bitcsk.Get("name") == "Jason");
         REQUIRE(bitcsk.Get("height") == "180");
         REQUIRE(bitcsk.Get("weight") == "76");
         REQUIRE_THROWS(bitcsk.Get("not_found"));
 
         // update
-        bitcsk.Put("name", "Mr. Timo Werner");
+        bitcsk.Put("name", "Jason");
         bitcsk.Put("height", "190");
         bitcsk.Put("weight", "78");
-        REQUIRE(bitcsk.Get("name") == "Mr. Timo Werner");
+        REQUIRE(bitcsk.Get("name") == "Jason");
         REQUIRE(bitcsk.Get("height") == "190");
         REQUIRE(bitcsk.Get("weight") == "78");
         REQUIRE(bitcsk.Size() == 6);
@@ -115,14 +115,14 @@ TEST_CASE("CRUD operation on bitcask with close", "[crud-close]") {
         bitcsk.Open();
 
         // insert
-        bitcsk.Put("name", "Timo Werner");
+        bitcsk.Put("name", "Jason");
         bitcsk.Put("height", "180");
         bitcsk.Put("weight", "76");
         bitcsk.Put("age", "25");
         bitcsk.Put("foot", "right");
         bitcsk.Put("positions", "[ST, LW]");
         REQUIRE(bitcsk.Size() == 6);
-        REQUIRE(bitcsk.Get("name") == "Timo Werner");
+        REQUIRE(bitcsk.Get("name") == "Jason");
         REQUIRE(bitcsk.Get("height") == "180");
         REQUIRE(bitcsk.Get("weight") == "76");
         REQUIRE_THROWS(bitcsk.Get("not_found"));
@@ -132,10 +132,10 @@ TEST_CASE("CRUD operation on bitcask with close", "[crud-close]") {
         bitcsk.Open();
         bitcsk.Put("salry", "$65k/week");
         bitcsk.Put("sponsor", "Nike");
-        bitcsk.Put("name", "Mr. Timo Werner");
+        bitcsk.Put("name", "Jason");
         bitcsk.Put("height", "190");
         bitcsk.Put("weight", "78");
-        REQUIRE(bitcsk.Get("name") == "Mr. Timo Werner");
+        REQUIRE(bitcsk.Get("name") == "Jason");
         REQUIRE(bitcsk.Get("height") == "190");
         REQUIRE(bitcsk.Get("weight") == "78");
         REQUIRE(bitcsk.Get("age") == "25");
@@ -147,7 +147,7 @@ TEST_CASE("CRUD operation on bitcask with close", "[crud-close]") {
         bitcsk.Open();
         bitcsk.Delete("height");
         bitcsk.Delete("weight");
-        REQUIRE(bitcsk.Get("name") == "Mr. Timo Werner");
+        REQUIRE(bitcsk.Get("name") == "Jason");
         REQUIRE(bitcsk.Get("age") == "25");
         REQUIRE(bitcsk.Get("foot") == "right");
         REQUIRE_THROWS(bitcsk.Delete("not_found"));
@@ -160,7 +160,37 @@ TEST_CASE("CRUD operation on bitcask with close", "[crud-close]") {
     REQUIRE(status == true);
 }
 
-
 TEST_CASE("CRUD operation on bitcask with concurency", "[crud-close]") {
 
+}
+
+TEST_CASE("Scan", "[scan-prefix]") {
+    bitcaskcpp::BitcaskOption options;
+    bool status = with("tempdir", [&](fs::path& dir) {
+        auto db_path = dir / "testdb";
+        bitcaskcpp::Bitcask bitcsk(db_path, options);
+        bitcsk.Open();
+
+        bitcsk.Put("aa", "a");
+        bitcsk.Put("bb", "b");
+        bitcsk.Put("cc", "c");
+        // insert
+        bitcsk.Put("users_1", "user1_json");
+        bitcsk.Put("users_2", "user2_json");
+        bitcsk.Put("users_3", "user3_json");
+        bitcsk.Put("users_4", "user4_json");
+
+        bitcsk.Put("docs_1", "doc1_json");
+        bitcsk.Put("docs_2", "doc2_json");
+        bitcsk.Put("docs_3", "doc3_json");
+        bitcsk.Put("docs_4", "doc4_json");
+
+        size_t count = bitcsk.Scan("docs_", [](auto key, auto value) {
+            REQUIRE(value.rfind("doc", 0) == 0);
+        });
+         
+        REQUIRE(count == 4);
+    });
+
+    REQUIRE(status == true);
 }

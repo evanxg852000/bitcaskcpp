@@ -43,7 +43,7 @@ static void bistcask_get(picobench::state& s) {
         bitcsk.Open();
         for(auto i = 0; i < 100; ++i) {
             auto key = std::to_string(i);
-            auto value = std::string(rand() % 20, '-');
+            auto value = std::string((rand() % 20) + 1, '-');
             bitcsk.Put(key.data(), value.data());
         }
 
