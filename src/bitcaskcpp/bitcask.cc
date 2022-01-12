@@ -14,7 +14,11 @@ Bitcask::Bitcask(std::string path, BitcaskOption options)
     : storage_dir{fs::path(path)}, options{options},
       active_file_id{0}, size{0}, is_opened{false} {}
 
-Bitcask::~Bitcask() {}
+Bitcask::~Bitcask() {
+  if (options.auto_close && is_opened) {
+    this->Close();
+  }  
+}
 
 void Bitcask::Open() {
   std::unique_lock lock(mutex);
@@ -144,18 +148,22 @@ size_t Bitcask::Size() {
   return size; 
 }
 
-void Bitcask::Scan(char *prefix, scan_callback_t func) {
+size_t Bitcask::Scan(const char *prefix, scan_callback_t func) {
   assert(prefix != nullptr);
   assert(func != nullptr);
 
   std::shared_lock lock(mutex);
   ensure();
   
+  size_t count = 0;
   for (auto it = key_dir.begin(prefix); it != key_dir.end(); ++it) {
     std::fstream& reader = bitcask_file((*it)->file_id).GetFileStream();
     auto [_, key, value] = get_value(reader, (*it)->record_offset);
+    if(key.rfind(prefix, 0) != 0) break;
     func(key, value);
+    count++;
   }
+  return count;
 }
 
 void Bitcask::Sync() {
@@ -219,7 +227,7 @@ void Bitcask::Compact() {
 
     // create hint_file entry
     // TODO: try to make key available via iterator, it's realy annoying that we
-    // have to read this via disk data
+    // have to read this from disk
     // https://github.com/rafaelkallis/adaptive-radix-tree/issues/9
     std::stringstream data_reader;
     data_reader.str(buffer.data());
@@ -227,7 +235,7 @@ void Bitcask::Compact() {
     size_t key_size = key.length();
     size_t record_size = buffer.length();
 
-    buffer.resize(BitcaskLayout::GetHintRecordSize(key_size), '\0');
+    buffer.resize(BitcaskItemLayout::GetHintRecordSize(key_size), '\0'); //TODO: check clear
     buffer.append(ByteOrder::toLittleEndianString<size_t>(key_size));
     buffer.append(key);
     buffer.append(ByteOrder::toLittleEndianString<size_t>(record_size));
@@ -306,7 +314,7 @@ void Bitcask::load_hint_file(uint64_t file_id) {
 
   // traverse hint file forward
   while (offset <= total_size) {
-    BitcaskLayout layout(offset);
+    BitcaskItemLayout layout(offset);
     size_t key_size = ByteOrder::readLittleEndian<size_t>(reader, layout.GetHintKeySizeOffset());
     std::string key = read_data(reader, layout.GetHintKeyOffset(), key_size);
     size_t record_size =
@@ -315,13 +323,13 @@ void Bitcask::load_hint_file(uint64_t file_id) {
         ByteOrder::readLittleEndian<size_t>(reader, layout.GetHintRecordOffsetOffset(key_size));
     key_dir.set(key.data(),
                 new BitcaskEntry(file_id, record_size, record_offset));
-    offset += BitcaskLayout::GetHintRecordSize(key_size);
+    offset += BitcaskItemLayout::GetHintRecordSize(key_size);
   }
 }
 
 std::tuple<size_t, std::string, std::string> Bitcask::get_value(std::istream &reader,
                                                       size_t offset) {
-  BitcaskLayout layout(offset);
+  BitcaskItemLayout layout(offset);
 
   uint32_t checksum = ByteOrder::readLittleEndian<uint32_t>(reader, layout.GetChecksumOffset());
   size_t key_size = ByteOrder::readLittleEndian<size_t>(reader, layout.GetKeySizeOffset());
@@ -329,7 +337,7 @@ std::tuple<size_t, std::string, std::string> Bitcask::get_value(std::istream &re
 
   std::string key = read_data(reader, layout.GetKeyOffset(), key_size);
   std::string value = read_data(reader, layout.GetValueOffset(key_size), value_size);
-  size_t record_size = BitcaskLayout::GetRecordSize(key_size, value_size);
+  size_t record_size = BitcaskItemLayout::GetRecordSize(key_size, value_size);
 
   return std::make_tuple(record_size, key, value);
 }

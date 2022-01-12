@@ -6,7 +6,10 @@
 
 namespace bitcaskcpp {
 
-class BitcaskOption {};
+struct BitcaskOption {
+    std::optional<size_t> compaction_treshold;
+    bool auto_close;
+};
 
 uint32_t timestamp();
 

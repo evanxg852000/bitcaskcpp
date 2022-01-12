@@ -20,8 +20,7 @@ and a compatible server (wip).
 
 Bitcask is great for storing hundreds of thousands to millions of key/value pairs. It can be used when you need very high write throughput while maintaining predictable read throughput. I you are thinking of [LevelDb](https://github.com/google/leveldb), [RocksDB](http://rocksdb.org/) or any other key value store, then bitcask should 
 be a great option to consider. It's important to note that bistcask keeps all its keys in memory. if your 
-expected keyspace does not fit in RAM, Bitcask might not be the right storage engine for you. Note that this 
-only concerns the keys not the values.
+expected keyspace does not fit in RAM, Bitcask might not be the right storage engine for you. Note that this only concerns the keys not the values.
 
 
 ## Development
@@ -56,7 +55,8 @@ cmake --build .
 TODO:
 - [ ] benchmark
 - [ ] test concurency
-- [ ] add crc & compaction trigger option 
+- [ ] benchmark
+- [ ] implement own art in order to move to apache license
 
 ```
 ===============================================================================
