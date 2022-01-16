@@ -4,6 +4,7 @@
 #include <unordered_set>
 #include <iostream>
 #include <sstream>
+#include <memory>
 
 #include "bitcaskcpp/bitcask.h"
 
@@ -95,7 +96,7 @@ void Bitcask::Put(const char *key, const char *value) {
 
   bool is_new = (key_dir.get(key) == nullptr);
   auto [record_size, record_offset] = write_value(key, value);
-  key_dir.set(key, new BitcaskEntry(active_file_id, record_size, record_offset));
+  key_dir.set(key, std::make_shared<BitcaskEntry>(active_file_id, record_size, record_offset));
   if(is_new) {
     size += 1;
   }
@@ -116,7 +117,7 @@ std::string Bitcask::Get(const char *key) {
   std::shared_lock lock(mutex);
   ensure();
 
-  BitcaskEntry *entry = key_dir.get(key);
+  auto entry = key_dir.get(key);
   if (entry == nullptr) {
     throw Exception("Requested key not found in bistcask storage.");
   }
@@ -132,7 +133,7 @@ void Bitcask::Delete(const char *key) {
   std::unique_lock lock(mutex);
   ensure();
 
-  BitcaskEntry *entry = key_dir.get(key);
+  auto entry = key_dir.get(key);
   if (entry == nullptr) {
     throw Exception("Requested key not found in bistcask storage.");
   }
@@ -212,7 +213,9 @@ void Bitcask::Compact() {
                    std::ios::binary | std::ios::out | std::ios::app);
   hint_writer.seekg(0, std::ios_base::end);
 
-  for (const auto entry : key_dir) {
+  for (auto it = key_dir.begin(), it_end = key_dir.end(); it != it_end; ++it) {
+    auto key = it.key();
+    auto entry = *it;
     trash_files.insert(entry->file_id);
 
     size_t record_offset = writer.tellp();
@@ -225,13 +228,7 @@ void Bitcask::Compact() {
     entry->file_id = compation_file_id;
     entry->record_offset = record_offset;
 
-    // create hint_file entry
-    // TODO: try to make key available via iterator, it's realy annoying that we
-    // have to read this from disk
-    // https://github.com/rafaelkallis/adaptive-radix-tree/issues/9
-    std::stringstream data_reader;
-    data_reader.str(buffer.data());
-    auto [_, key, __] = get_value(data_reader, 0);
+    // write hint_file entry
     size_t key_size = key.length();
     size_t record_size = buffer.length();
 
@@ -294,7 +291,7 @@ void Bitcask::load_data(uint64_t file_id) {
       continue;
     }
 
-    key_dir.set(key.data(), new BitcaskEntry(file_id, record_size, record_offset));
+    key_dir.set(key.data(), std::make_shared<BitcaskEntry>(file_id, record_size, record_offset));
     if (record_offset == 0)
       break;
     record_offset = ByteOrder::readLittleEndian<size_t>(reader, record_offset - sizeof(size_t));
@@ -322,7 +319,7 @@ void Bitcask::load_hint_file(uint64_t file_id) {
     size_t record_offset = 
         ByteOrder::readLittleEndian<size_t>(reader, layout.GetHintRecordOffsetOffset(key_size));
     key_dir.set(key.data(),
-                new BitcaskEntry(file_id, record_size, record_offset));
+                std::make_shared<BitcaskEntry>(file_id, record_size, record_offset));
     offset += BitcaskItemLayout::GetHintRecordSize(key_size);
   }
 }

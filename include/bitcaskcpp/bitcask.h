@@ -163,7 +163,7 @@ class Bitcask {
     // The storage directory.
     fs::path storage_dir;
     // The key directory implement using an adaptive radix tree.
-    art::art<BitcaskEntry> key_dir;
+    art::art<std::shared_ptr<BitcaskEntry>> key_dir;
     // A map of ids to files currently opened by bistcask.
     std::unordered_map<uint64_t, BitcaskFile> open_files;
     // The active writable file.
